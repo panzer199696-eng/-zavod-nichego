@@ -1598,29 +1598,25 @@ class AchievementBanner:
 class App:
     def __init__(self):
         pygame.init()
+        # Звука в игре нет — отключаем mixer. На Android SDL2_mixer падает в SIGSEGV
+        # если аудиоустройство занято или не инициализировано системой.
+        try:
+            pygame.mixer.quit()
+        except Exception:
+            pass
 
-        # На Android p4a SDL2 уже создал fullscreen окно — НЕ передаём флаги,
-        # иначе SDL2 пытается сменить разрешение → SIGSEGV.
-        # Используем (0,0) чтобы получить нативный размер, рисуем на виртуальном Surface.
+        # FULLSCREEN | SCALED: pygame использует SDL_RenderSetLogicalSize → НЕ меняет
+        # аппаратное разрешение → нет SIGSEGV. Координаты event.pos автоматически
+        # масштабируются в пространство W×H (не нужна ручная трансформация).
+        _SCALED = getattr(pygame, "SCALED", 0)
         if _IS_ANDROID:
-            self.screen = pygame.display.set_mode((0, 0))
-            sw, sh = self.screen.get_size()
-            # Если set_mode((0,0)) вернул 0x0 — пробуем через display.Info()
-            if sw <= 0 or sh <= 0:
-                info = pygame.display.Info()
-                sw = info.current_w if info.current_w > 0 else 1080
-                sh = info.current_h if info.current_h > 0 else 1920
-                self.screen = pygame.display.set_mode((sw, sh), pygame.FULLSCREEN)
-            self._vscale = min(sw / W, sh / H)
-            self._vox = (sw - int(W * self._vscale)) // 2
-            self._voy = (sh - int(H * self._vscale)) // 2
-            self._game_surf = pygame.Surface((W, H))
+            flags = pygame.FULLSCREEN | (_SCALED or 0)
         else:
-            _SCALED = getattr(pygame, "SCALED", 0)
-            self.screen = pygame.display.set_mode((W, H), _SCALED or 0)
-            self._game_surf = None
-            self._vscale = 1.0
-            self._vox = self._voy = 0
+            flags = _SCALED or 0
+        self.screen = pygame.display.set_mode((W, H), flags)
+        self._game_surf = None  # SCALED обрабатывает масштабирование нативно
+        self._vscale = 1.0
+        self._vox = self._voy = 0
 
         pygame.display.set_caption("ЗАВОД НИЧЕГО")
         self.clock = pygame.time.Clock()

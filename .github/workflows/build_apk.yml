@@ -58,7 +58,7 @@ jobs:
             ${{ runner.os }}-buildozer-
 
       - name: Install Buildozer
-        run: pip install --upgrade buildozer cython
+        run: pip install --upgrade buildozer "cython==0.29.34"
 
       - name: Build APK
         run: buildozer android debug 2>&1 | tee build.log
