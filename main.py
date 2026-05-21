@@ -1458,11 +1458,12 @@ class Button:
         txt = fonts[self.font_key].render(self.text, False, C["white"])
         surf.blit(txt, txt.get_rect(center=self.rect.center))
 
-    def is_clicked(self, event):
+    def is_clicked(self, event, pos=None):
+        p = pos if pos is not None else event.pos
         return (
             event.type == pygame.MOUSEBUTTONDOWN
             and event.button == 1
-            and self.rect.collidepoint(event.pos)
+            and self.rect.collidepoint(p)
         )
 
 
@@ -1478,7 +1479,7 @@ class EventPopup:
     def update(self, dt):
         self.life -= dt
 
-    def draw(self, surf, fonts):
+    def draw(self, surf, fonts, mp=(0, 0)):
         dim = pygame.Surface((W, H), pygame.SRCALPHA)
         dim.fill((0, 0, 0, 170))
         surf.blit(dim, (0, 0))
@@ -1499,10 +1500,10 @@ class EventPopup:
             surf.blit(lt, lt.get_rect(centerx=W // 2, y=y))
             y += 22
 
-        self.button.draw(surf, fonts, pygame.mouse.get_pos())
+        self.button.draw(surf, fonts, mp)
 
-    def handle(self, event):
-        return self.button.is_clicked(event)
+    def handle(self, event, vpos=None):
+        return self.button.is_clicked(event, vpos)
 
 
 class EpochPopup(EventPopup):
@@ -1522,7 +1523,7 @@ class PrestigeConfirmPopup:
         )
         self.result = None
 
-    def draw(self, surf, fonts):
+    def draw(self, surf, fonts, mp=(0, 0)):
         dim = pygame.Surface((W, H), pygame.SRCALPHA)
         dim.fill((0, 0, 0, 200))
         surf.blit(dim, (0, 0))
@@ -1555,14 +1556,13 @@ class PrestigeConfirmPopup:
             surf.blit(lt, lt.get_rect(centerx=W // 2, y=y))
             y += 20
 
-        mp = pygame.mouse.get_pos()
         self.btn_yes.draw(surf, fonts, mp)
         self.btn_no.draw(surf, fonts, mp)
 
-    def handle(self, event):
-        if self.btn_yes.is_clicked(event):
+    def handle(self, event, vpos=None):
+        if self.btn_yes.is_clicked(event, vpos):
             self.result = True
-        if self.btn_no.is_clicked(event):
+        if self.btn_no.is_clicked(event, vpos):
             self.result = False
 
 
@@ -1597,24 +1597,22 @@ class App:
     def __init__(self):
         pygame.init()
 
-        # Инициализация дисплея: на Android пробуем SCALED, fallback — (0,0)+отдельный Surface
-        _SCALED = getattr(pygame, "SCALED", 0)
-        self._game_surf = None  # будет не None если экран физически больше 360×640
-
+        # На Android p4a SDL2 уже создал fullscreen окно — НЕ передаём флаги,
+        # иначе SDL2 пытается сменить разрешение → SIGSEGV.
+        # Используем (0,0) чтобы получить нативный размер, рисуем на виртуальном Surface.
         if _IS_ANDROID:
-            try:
-                if _SCALED:
-                    self.screen = pygame.display.set_mode(
-                        (W, H), pygame.FULLSCREEN | _SCALED
-                    )
-                else:
-                    raise RuntimeError("no SCALED")
-            except Exception:
-                # Fallback: берём нативное разрешение, рисуем в виртуальный Surface
-                self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-                self._game_surf = pygame.Surface((W, H))
+            self.screen = pygame.display.set_mode((0, 0))
+            sw, sh = self.screen.get_size()
+            self._vscale = min(sw / W, sh / H)
+            self._vox = (sw - int(W * self._vscale)) // 2
+            self._voy = (sh - int(H * self._vscale)) // 2
+            self._game_surf = pygame.Surface((W, H))
         else:
+            _SCALED = getattr(pygame, "SCALED", 0)
             self.screen = pygame.display.set_mode((W, H), _SCALED or 0)
+            self._game_surf = None
+            self._vscale = 1.0
+            self._vox = self._voy = 0
 
         pygame.display.set_caption("ЗАВОД НИЧЕГО")
         self.clock = pygame.time.Clock()
@@ -1659,6 +1657,15 @@ class App:
                 "Офлайн-прогресс",
                 f"Пока вас не было,\nзавод усердно ничего\nне делал.\n\nПроизведено:\n+{fmt_num(offline_gain)} ничего",
             )
+
+    def _virt_pos(self, pos):
+        """Physical screen coords → virtual 360×640 game coords."""
+        if not self._game_surf:
+            return pos
+        return (
+            (pos[0] - self._vox) / self._vscale,
+            (pos[1] - self._voy) / self._vscale,
+        )
 
     def run(self):
         prev = time.time()
@@ -1713,9 +1720,12 @@ class App:
             self.game.save()
             sys.exit()
 
+        # Трансформируем физические координаты касания → виртуальные игровые
+        vpos = self._virt_pos(event.pos) if hasattr(event, "pos") else None
+
         # Пресейв-попап приоритетнее
         if self.prestige_popup:
-            self.prestige_popup.handle(event)
+            self.prestige_popup.handle(event, vpos)
             if self.prestige_popup.result is True:
                 self.game.do_prestige()
                 self.prestige_popup = None
@@ -1726,40 +1736,39 @@ class App:
             return
 
         if self.popup:
-            if self.popup.handle(event):
+            if self.popup.handle(event, vpos):
                 self.popup = None
             return
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.factory_rect.collidepoint(event.pos):
+            p = vpos or event.pos
+            if self.factory_rect.collidepoint(p):
                 v = self.game.do_click()
                 self.factory.click_fx()
                 col = random.choice([C["yellow"], C["cyan"], C["pink"], C["orange"]])
-                self.particles.append(
-                    Particle(event.pos[0], event.pos[1], f"+{fmt_num(v)}", col)
-                )
+                self.particles.append(Particle(p[0], p[1], f"+{fmt_num(v)}", col))
                 return
 
-            if self.tab_w.is_clicked(event):
+            if self.tab_w.is_clicked(event, p):
                 self.tab, self.scroll = "workers", 0
-            if self.tab_u.is_clicked(event):
+            if self.tab_u.is_clicked(event, p):
                 self.tab, self.scroll = "upgrades", 0
-            if self.tab_p.is_clicked(event):
+            if self.tab_p.is_clicked(event, p):
                 self.tab, self.scroll = "progress", 0
 
             if self.tab == "workers":
                 for btn, wid in getattr(self, "_wbtns", []):
-                    if btn.is_clicked(event):
+                    if btn.is_clicked(event, p):
                         self.game.buy_worker(wid)
 
             if self.tab == "upgrades":
                 for btn, uid in getattr(self, "_ubtns", []):
-                    if btn.is_clicked(event):
+                    if btn.is_clicked(event, p):
                         self.game.buy_upgrade(uid)
 
             if self.tab == "progress":
                 pb = getattr(self, "_prestige_btn", None)
-                if pb and pb.is_clicked(event):
+                if pb and pb.is_clicked(event, p):
                     self.prestige_popup = PrestigeConfirmPopup(self.game.prestige_count)
 
         _MOUSEWHEEL = getattr(pygame, "MOUSEWHEEL", None)
@@ -1821,7 +1830,7 @@ class App:
         self.tab_w.color_key = "yellow" if self.tab == "workers" else "button"
         self.tab_u.color_key = "yellow" if self.tab == "upgrades" else "button"
         self.tab_p.color_key = "yellow" if self.tab == "progress" else "button"
-        mp = pygame.mouse.get_pos()
+        mp = self._virt_pos(pygame.mouse.get_pos())
         self.tab_w.draw(surf, self.fonts, mp)
         self.tab_u.draw(surf, self.fonts, mp)
         self.tab_p.draw(surf, self.fonts, mp)
@@ -1833,7 +1842,7 @@ class App:
         elif self.tab == "upgrades":
             self._draw_upgrades_tab(surf, list_rect)
         elif self.tab == "progress":
-            self._draw_progress_tab(surf, list_rect)
+            self._draw_progress_tab(surf, list_rect, mp)
 
         # ── Баннеры достижений ────────────────────────────────────────────
         for b in self.ach_banners[:1]:
@@ -1841,9 +1850,9 @@ class App:
 
         # ── Попапы ────────────────────────────────────────────────────────
         if self.prestige_popup:
-            self.prestige_popup.draw(surf, self.fonts)
+            self.prestige_popup.draw(surf, self.fonts, mp)
         elif self.popup:
-            self.popup.draw(surf, self.fonts)
+            self.popup.draw(surf, self.fonts, mp)
 
         # Если рисовали в виртуальный Surface — масштабируем на физический экран
         if self._game_surf:
@@ -1924,7 +1933,7 @@ class App:
             lsuf, (list_rect.x, list_rect.y), (0, self.scroll, W, list_rect.height)
         )
 
-    def _draw_progress_tab(self, surf, list_rect):
+    def _draw_progress_tab(self, surf, list_rect, mp=(0, 0)):
         self._prestige_btn = None
         y = list_rect.y + 6
 
@@ -1989,7 +1998,7 @@ class App:
         pb_col = "gold" if can_prestige else "button"
         pb_text = "БАНКРОТСТВО" if can_prestige else f"нужно {fmt_num(threshold)}"
         pb = Button((8, y, W - 16, 36), pb_text, pb_col, "xs")
-        pb.draw(surf, self.fonts, pygame.mouse.get_pos())
+        pb.draw(surf, self.fonts, mp)
         self._prestige_btn = pb
         y += 44
         info = self.fonts["xs"].render(
