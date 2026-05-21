@@ -1596,19 +1596,36 @@ class AchievementBanner:
 class App:
     def __init__(self):
         pygame.init()
-        # На Android: FULLSCREEN + SCALED (масштабирует 360×640 на весь экран)
-        # На ПК: просто SCALED (окно 360×640, масштабируется при ресайзе)
+
+        # Инициализация дисплея: на Android пробуем SCALED, fallback — (0,0)+отдельный Surface
         _SCALED = getattr(pygame, "SCALED", 0)
-        _flags = (pygame.FULLSCREEN | _SCALED) if _IS_ANDROID else _SCALED
-        self.screen = pygame.display.set_mode((W, H), _flags)
+        self._game_surf = None  # будет не None если экран физически больше 360×640
+
+        if _IS_ANDROID:
+            try:
+                if _SCALED:
+                    self.screen = pygame.display.set_mode(
+                        (W, H), pygame.FULLSCREEN | _SCALED
+                    )
+                else:
+                    raise RuntimeError("no SCALED")
+            except Exception:
+                # Fallback: берём нативное разрешение, рисуем в виртуальный Surface
+                self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                self._game_surf = pygame.Surface((W, H))
+        else:
+            self.screen = pygame.display.set_mode((W, H), _SCALED or 0)
+
         pygame.display.set_caption("ЗАВОД НИЧЕГО")
         self.clock = pygame.time.Clock()
 
+        # Загрузка шрифта с fallback на системный
+        _font_src = str(FONT_PATH) if FONT_PATH.exists() else None
         self.fonts = {
-            "lg": pygame.font.Font(str(FONT_PATH), 20),
-            "md": pygame.font.Font(str(FONT_PATH), 11),
-            "sm": pygame.font.Font(str(FONT_PATH), 9),
-            "xs": pygame.font.Font(str(FONT_PATH), 7),
+            "lg": pygame.font.Font(_font_src, 20),
+            "md": pygame.font.Font(_font_src, 11),
+            "sm": pygame.font.Font(_font_src, 9),
+            "xs": pygame.font.Font(_font_src, 7),
         }
 
         self.game = Game()
@@ -1750,7 +1767,8 @@ class App:
             self.scroll = max(0, self.scroll - event.y * 40)
 
     def draw(self):
-        surf = self.screen
+        # Рисуем в виртуальный Surface (fallback) или напрямую в экран
+        surf = self._game_surf if self._game_surf else self.screen
 
         # Фон эпохи
         bg = EPOCHS[min(self.game.epoch_idx, len(EPOCHS) - 1)]["bg"]
@@ -1827,8 +1845,16 @@ class App:
         elif self.popup:
             self.popup.draw(surf, self.fonts)
 
-        if pygame.display.get_surface():
-            pygame.display.flip()
+        # Если рисовали в виртуальный Surface — масштабируем на физический экран
+        if self._game_surf:
+            sw, sh = self.screen.get_size()
+            scale = min(sw / W, sh / H)
+            nw, nh = int(W * scale), int(H * scale)
+            scaled = pygame.transform.scale(self._game_surf, (nw, nh))
+            self.screen.fill((0, 0, 0))
+            self.screen.blit(scaled, ((sw - nw) // 2, (sh - nh) // 2))
+
+        pygame.display.flip()
 
     def _draw_workers_tab(self, surf, list_rect):
         self._wbtns = []
@@ -2018,4 +2044,16 @@ class App:
 
 
 if __name__ == "__main__":
-    App().run()
+    try:
+        App().run()
+    except SystemExit:
+        pass
+    except Exception:
+        log_path = _SAVE_DIR / "crash.log"
+        try:
+            with open(log_path, "a") as _f:
+                _f.write(f"\n=== {datetime.datetime.now()} ===\n")
+                traceback.print_exc(file=_f)
+        except Exception:
+            pass
+        raise
