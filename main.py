@@ -1598,7 +1598,8 @@ class App:
         pygame.init()
         # На Android: FULLSCREEN + SCALED (масштабирует 360×640 на весь экран)
         # На ПК: просто SCALED (окно 360×640, масштабируется при ресайзе)
-        _flags = (pygame.FULLSCREEN | pygame.SCALED) if _IS_ANDROID else pygame.SCALED
+        _SCALED = getattr(pygame, "SCALED", 0)
+        _flags = (pygame.FULLSCREEN | _SCALED) if _IS_ANDROID else _SCALED
         self.screen = pygame.display.set_mode((W, H), _flags)
         pygame.display.set_caption("ЗАВОД НИЧЕГО")
         self.clock = pygame.time.Clock()
@@ -1744,7 +1745,8 @@ class App:
                 if pb and pb.is_clicked(event):
                     self.prestige_popup = PrestigeConfirmPopup(self.game.prestige_count)
 
-        if event.type == pygame.MOUSEWHEEL:
+        _MOUSEWHEEL = getattr(pygame, "MOUSEWHEEL", None)
+        if _MOUSEWHEEL and event.type == _MOUSEWHEEL:
             self.scroll = max(0, self.scroll - event.y * 40)
 
     def draw(self):
