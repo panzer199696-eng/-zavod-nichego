@@ -7,7 +7,7 @@ source.include_exts = py,ttf
 source.include_patterns = fonts/PressStart2P-Regular.ttf
 source.exclude_patterns = .buildozer,bin,save.json,notebooklm_source.md,*.md,*.bat,*.ps1
 version = 1.0
-requirements = hostpython3==3.11.9,python3==3.11.9,pygame==2.6.1
+requirements = hostpython3==3.9.18,python3==3.9.18,pygame==2.1.2
 orientation = portrait
 fullscreen = 1
 
