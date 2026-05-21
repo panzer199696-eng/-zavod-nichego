@@ -5,6 +5,8 @@ import math
 import json
 import time
 import os
+import traceback
+import datetime
 from pathlib import Path
 
 # ─── Android-совместимость ────────────────────────────────────────────────────
@@ -1603,6 +1605,12 @@ class App:
         if _IS_ANDROID:
             self.screen = pygame.display.set_mode((0, 0))
             sw, sh = self.screen.get_size()
+            # Если set_mode((0,0)) вернул 0x0 — пробуем через display.Info()
+            if sw <= 0 or sh <= 0:
+                info = pygame.display.Info()
+                sw = info.current_w if info.current_w > 0 else 1080
+                sh = info.current_h if info.current_h > 0 else 1920
+                self.screen = pygame.display.set_mode((sw, sh), pygame.FULLSCREEN)
             self._vscale = min(sw / W, sh / H)
             self._vox = (sw - int(W * self._vscale)) // 2
             self._voy = (sh - int(H * self._vscale)) // 2
@@ -1660,7 +1668,7 @@ class App:
 
     def _virt_pos(self, pos):
         """Physical screen coords → virtual 360×640 game coords."""
-        if not self._game_surf:
+        if not self._game_surf or self._vscale == 0:
             return pos
         return (
             (pos[0] - self._vox) / self._vscale,
@@ -1774,6 +1782,12 @@ class App:
         _MOUSEWHEEL = getattr(pygame, "MOUSEWHEEL", None)
         if _MOUSEWHEEL and event.type == _MOUSEWHEEL:
             self.scroll = max(0, self.scroll - event.y * 40)
+
+        # Android touch scroll (FINGERMOTION): dy нормализован 0-1 по высоте экрана
+        _FINGERMOTION = getattr(pygame, "FINGERMOTION", None)
+        if _FINGERMOTION and event.type == _FINGERMOTION:
+            _, sh = self.screen.get_size()
+            self.scroll = max(0, self.scroll - event.dy * sh)
 
     def draw(self):
         # Рисуем в виртуальный Surface (fallback) или напрямую в экран
