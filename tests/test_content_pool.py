@@ -89,19 +89,19 @@ def test_km2_scales_from_block():
     cb.energy = 99
     cb.play_card_instance(make_otpiska())  # 5 брони
     hp0 = cb.enemy.hp
-    cb.play_card_instance(make_km2())  # урон = 5 * 2 = 10
-    assert cb.enemy.hp == hp0 - 10
+    cb.play_card_instance(make_km2())  # урон = base 3 + 5 * 2 = 13
+    assert cb.enemy.hp == hp0 - 13
 
 
 def test_pererabotka_scales_with_cards_played():
     cb = _combat(enemy_hp=200)
     cb.energy = 99
-    # сыграем 2 дешёвые карты, затем переработку (она 3-я) -> 2*3 = 6
+    # сыграем 2 дешёвые карты, затем переработку (она 3-я) -> base 2 + 2*3 = 8
     cb.play_card_instance(make_otpiska())
     cb.play_card_instance(make_otpiska())
     hp0 = cb.enemy.hp
     cb.play_card_instance(make_pererabotka())
-    assert cb.enemy.hp == hp0 - 6
+    assert cb.enemy.hp == hp0 - 8
 
 
 def test_prinesi_poday_draws_on_third_card():

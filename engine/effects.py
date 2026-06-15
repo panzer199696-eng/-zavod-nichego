@@ -79,14 +79,15 @@ def draw_if_cards_played(n_draw: int, threshold: int):
     return _op
 
 
-def scale_damage_from_cards_played(multiplier: int):
-    """Урон = multiplier × число сыгранных за ход карт (включая эту).
+def scale_damage_from_cards_played(multiplier: int, base: int = 0):
+    """Урон = base + multiplier × число сыгранных за ход карт (включая эту).
 
-    «Переработка по-молодому»: 2 урона × число карт за ход.
+    «Переработка по-молодому»: base 2 + 2 × число карт за ход — base гарантирует
+    минимум урона даже когда карта сыграна первой (не «карта-труп»).
     """
 
     def _op(combat, source, target):
-        dmg = multiplier * (combat.cards_played_this_turn + 1)
+        dmg = base + multiplier * (combat.cards_played_this_turn + 1)
         combat.deal_damage(source, target, dmg)
 
     return _op
@@ -97,16 +98,19 @@ def scale_damage_from_status(
     multiplier: int,
     cap: Optional[int] = None,
     consume: bool = False,
+    base: int = 0,
 ):
-    """Урон = multiplier × стаки статуса источника (с опц. кэпом).
+    """Урон = base + multiplier × стаки статуса источника (с опц. кэпом).
 
-    Используется для «Аврала» (3 × Запал, макс 24).
+    Используется для «Аврала» (base 3 + 3 × Запал, макс 27). base гарантирует
+    минимум урона при 0 стаков — Аврал в стартовой колоде не «карта-труп».
+    cap ограничивает итог уже С учётом base.
     consume=True обнуляет статус после применения.
     """
 
     def _op(combat, source, target):
         stacks = source.get_status(key)
-        dmg = multiplier * stacks
+        dmg = base + multiplier * stacks
         if cap is not None:
             dmg = min(dmg, cap)
         combat.deal_damage(source, target, dmg)
@@ -116,11 +120,14 @@ def scale_damage_from_status(
     return _op
 
 
-def scale_damage_from_block(multiplier: float):
-    """Урон = броня источника × multiplier (КМ-2 / Спрос с подчинённых)."""
+def scale_damage_from_block(multiplier: float, base: int = 0):
+    """Урон = base + броня источника × multiplier (КМ-2 / Спрос с подчинённых).
+
+    base даёт гарантированный минимум при 0 брони — КМ-2 не «карта-труп».
+    """
 
     def _op(combat, source, target):
-        dmg = int(source.block * multiplier)
+        dmg = base + int(source.block * multiplier)
         combat.deal_damage(source, target, dmg)
 
     return _op

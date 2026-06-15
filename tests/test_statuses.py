@@ -54,18 +54,18 @@ def test_avral_scales_with_zapal():
     cb.start_combat()
     cb.hero.set_status(STATUS.ZAPAL, 4)
     before = cb.enemy.hp
-    cb.play_card_instance(make_avral())  # 3 * 4 = 12
-    assert before - cb.enemy.hp == 12
+    cb.play_card_instance(make_avral())  # base 3 + 3 * 4 = 15
+    assert before - cb.enemy.hp == 15
 
 
-def test_avral_capped_at_24():
+def test_avral_capped_at_27():
     enemy = new_enemy(hp=500, intents=[])
     cb = _stazher_vs(enemy)
     cb.start_combat()
-    cb.hero.set_status(STATUS.ZAPAL, 20)  # 3*20=60, но кэп 24
+    cb.hero.set_status(STATUS.ZAPAL, 20)  # base 3 + 3*20=63, но кэп 27
     before = cb.enemy.hp
     cb.play_card_instance(make_avral())
-    assert before - cb.enemy.hp == 24
+    assert before - cb.enemy.hp == 27
 
 
 def test_zapal_resets_at_end_of_turn():

@@ -56,9 +56,10 @@ def make_begotnya() -> Card:
 
 
 def make_avral() -> Card:
-    """Аврал — Атака, 1 энергии, 3 × Запал урона, макс 24 (кэп Запал≤8).
+    """Аврал — Атака, 1 энергии, base 3 + 3 × Запал урона, макс 27.
 
-    Финишер: тратит Запал, сам его не начисляет.
+    Финишер: тратит Запал, сам его не начисляет. base 3 даёт минимум урона при
+    0 Запала, чтобы Аврал в стартовой колоде не был «картой-трупом» (этап B).
     """
     return Card(
         id="avral",
@@ -67,11 +68,11 @@ def make_avral() -> Card:
         cost=1,
         effects=[
             fx.scale_damage_from_status(
-                STATUS.ZAPAL, multiplier=3, cap=24, consume=True
+                STATUS.ZAPAL, multiplier=3, cap=27, consume=True, base=3
             )
         ],
         no_zapal=True,
-        description="3 урона × Запал (макс 24), тратит весь Запал",
+        description="3 + 3×Запал урона (макс 27), тратит весь Запал",
     )
 
 
@@ -122,9 +123,9 @@ def make_pererabotka() -> Card:
         name="Переработка по-молодому",
         card_type=CardType.ACTION,
         cost=2,
-        effects=[fx.scale_damage_from_cards_played(2)],
+        effects=[fx.scale_damage_from_cards_played(2, base=2)],
         no_zapal=True,
-        description="2 урона × число сыгранных карт за ход",
+        description="2 + 2×число сыгранных карт за ход урона",
     )
 
 
@@ -183,10 +184,10 @@ def make_km2() -> Card:
         name="КМ-2",
         card_type=CardType.ATTACK,
         cost=1,
-        effects=[fx.scale_damage_from_block(2.0)],
+        effects=[fx.scale_damage_from_block(2.0, base=3)],
         rarity=Rarity.UNCOMMON,
         no_zapal=True,
-        description="Урон = твоя броня × 2",
+        description="Урон = 3 + твоя броня × 2",
     )
 
 
