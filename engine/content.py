@@ -321,6 +321,110 @@ def make_premiya_po_itogam() -> Card:
     )
 
 
+# --- Этап C: расширение пула (+6) под 4 архетипа ---
+
+
+def make_goret_na_rabote() -> Card:
+    """Гореть на работе — Атака, 1 энергии, base 4 + 2×Запал урона, НЕ тратит Запал.
+
+    Второй Запал-пейофф архетипа бёрста: в отличие от Аврала (финишер, сжигает
+    Запал), даёт устойчивый урон от накопленного Запала и сохраняет его для
+    следующего удара. Множитель ниже (×2), чтобы повторяемость не ломала баланс.
+    """
+    return Card(
+        id="goret_na_rabote",
+        name="Гореть на работе",
+        card_type=CardType.ATTACK,
+        cost=1,
+        effects=[fx.scale_damage_from_status(STATUS.ZAPAL, multiplier=2, base=4)],
+        rarity=Rarity.UNCOMMON,
+        no_zapal=True,
+        description="4 + 2×Запал урона (не тратит Запал)",
+    )
+
+
+def make_krugovaya_oborona() -> Card:
+    """Круговая оборона — Защита, 2 энергии, 7 брони + тянуть 1 (танк + цикл)."""
+    return Card(
+        id="krugovaya_oborona",
+        name="Круговая оборона",
+        card_type=CardType.DEFENSE,
+        cost=2,
+        effects=[fx.gain_block(7), fx.draw_cards(1)],
+        description="7 брони, тянуть 1 карту",
+    )
+
+
+def make_stop_rabota() -> Card:
+    """Стоп-работа — Схема, 2 энергии, Заморозить врага на 1 ход, изгнать.
+
+    Дешёвый чистый контроль: как «Заморозить смету», но без брони — поэтому
+    обычнее (Uncommon vs Rare). Заморозка = враг пропускает следующую атаку.
+    """
+    return Card(
+        id="stop_rabota",
+        name="Стоп-работа",
+        card_type=CardType.SCHEME,
+        cost=2,
+        effects=[fx.apply_status(STATUS.FROZEN, 1)],
+        rarity=Rarity.UNCOMMON,
+        exhaust=True,
+        no_zapal=True,
+        description="Враг пропускает следующую атаку, изгнать",
+    )
+
+
+def make_bumazhnaya_volokita() -> Card:
+    """Бумажная волокита — Действие, 1 энергии, Простой 3 врагу (до кэпа).
+
+    Дешёвый максимум контроля: Простой капается на 3 (−9 к урону атаки врага),
+    спадает по 1 в конце хода. Чистый дебаф без урона/брони.
+    """
+    return Card(
+        id="bumazhnaya_volokita",
+        name="Бумажная волокита",
+        card_type=CardType.ACTION,
+        cost=1,
+        effects=[fx.apply_status(STATUS.WEAKEN, 3)],
+        no_zapal=True,
+        description="Простой 3 врагу (макс)",
+    )
+
+
+def make_tekuchka() -> Card:
+    """Текучка — Схема, 0 энергии, тянуть 1 + энергия 1, изгнать (цикл-движок).
+
+    Бесплатный кантрип: возвращает энергию и заменяет себя в руке, прореживая
+    колоду (изгнание). От дешевизны даёт +1 Запал (не финишер). Опора цикл-билда.
+    """
+    return Card(
+        id="tekuchka",
+        name="Текучка",
+        card_type=CardType.SCHEME,
+        cost=0,
+        effects=[fx.draw_cards(1), fx.gain_energy(1)],
+        rarity=Rarity.UNCOMMON,
+        exhaust=True,
+        description="Тянуть 1 карту, +1 энергии, изгнать. (+1 Запал)",
+    )
+
+
+def make_poruchenie() -> Card:
+    """Поручение — Действие, 1 энергии, 5 урона; при 2+ картах за ход — тянуть 1.
+
+    Дешёвая агрессия с добором: порог ниже, чем у «Принеси-подай» (2 против 3),
+    зато требует энергии — встраивается в цикл/бёрст. От дешевизны даёт +1 Запал.
+    """
+    return Card(
+        id="poruchenie",
+        name="Поручение",
+        card_type=CardType.ACTION,
+        cost=1,
+        effects=[fx.deal_damage(5), fx.draw_if_cards_played(1, threshold=2)],
+        description="5 урона. При 2+ картах за ход — тянуть 1. (+1 Запал)",
+    )
+
+
 # ============================== ГЕРОИ =================================
 
 
@@ -517,12 +621,18 @@ STAZHER_REWARD_POOL: list = [
     make_perekur,
     make_soglasovat_ustno,
     make_pererabotka,
+    make_krugovaya_oborona,  # этап C (танк+цикл)
+    make_bumazhnaya_volokita,  # этап C (контроль)
+    make_poruchenie,  # этап C (цикл+бёрст)
     # необычные
     make_sluzhebnaya,
     make_km2,
     make_chernaya_metka,
     make_delegirovanie,
     make_prostoy_obyekta,
+    make_goret_na_rabote,  # этап C (бёрст)
+    make_stop_rabota,  # этап C (контроль)
+    make_tekuchka,  # этап C (цикл)
     # редкие
     make_fors_mazhor,
     make_zamorozit_smetu,
