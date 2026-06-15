@@ -11,7 +11,7 @@ import random
 from dataclasses import dataclass, field
 from typing import Optional
 
-from engine.content import build_stazher, reward_pool_cards
+from engine.content import RELIC_REGISTRY, build_stazher, reward_pool_cards
 from engine.models import Card, Hero, Rarity
 
 # Сколько карт показывать в награду и валюта за обычный бой.
@@ -88,6 +88,16 @@ class RunState:
 
     def add_relic(self, relic) -> None:
         self.relics.append(relic)
+
+    def roll_relic_reward(self):
+        """Выдать реликвию-награду (элита/босс): случайную из реестра, которой
+        ещё нет у игрока. Детерминирована по rng забега. None — если все собраны.
+        """
+        owned = {r.id for r in self.relics}
+        available = [cls for cls in RELIC_REGISTRY if cls.id not in owned]
+        if not available:
+            return None
+        return self.rng.choice(available)()
 
     # --- удобство для боя ---
     def battle_deck(self) -> list[Card]:

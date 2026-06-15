@@ -784,6 +784,69 @@ class ByurokraticheskiyImmunitet(Relic):
         combat.hero.set_status(STATUS.BUREAUCRACY, 0)
 
 
+# --- Этап D: реликвии с постоянным (каждый ход) эффектом под архетипы ---
+
+
+class VechnyyDedlayn(Relic):
+    """Вечный дедлайн (бёрст) — в начале КАЖДОГО хода +1 Запал.
+
+    В отличие от разовых Бейджа/Кружки, держит постоянный пол Запала: Гореть на
+    работе и Аврал всегда бьют выше базы, даже без раскрутки.
+    """
+
+    id = "vechnyy_dedlayn"
+    name = "Вечный дедлайн"
+    description = "В начале каждого хода +1 Запал"
+
+    def on_turn_start(self, combat) -> None:
+        combat.hero.add_status(STATUS.ZAPAL, 1)
+
+
+class KaskaSTreshchinoy(Relic):
+    """Каска с трещиной (танк) — в начале КАЖДОГО хода +2 брони.
+
+    Постоянный приток брони (не только 1-й ход, как Кофемашина/Толстая папка):
+    кормит КМ-2 и переживает затяжные бои.
+    """
+
+    id = "kaska_s_treshchinoy"
+    name = "Каска с трещиной"
+    description = "В начале каждого хода +2 брони"
+
+    def on_turn_start(self, combat) -> None:
+        combat.hero.gain_block(2)
+
+
+class ZhurnalZamechaniy(Relic):
+    """Журнал замечаний (контроль) — в начале КАЖДОГО хода враг получает Простой 1.
+
+    Постоянный дебаф атаки (в отличие от разового Простой 2 Чёрного списка):
+    с учётом спада Простоя держит врага ослабленным весь бой.
+    """
+
+    id = "zhurnal_zamechaniy"
+    name = "Журнал замечаний"
+    description = "В начале каждого хода враг получает Простой 1"
+
+    def on_turn_start(self, combat) -> None:
+        combat.enemy.add_status(STATUS.WEAKEN, 1)
+
+
+class Skorosshivatel(Relic):
+    """Скоросшиватель (цикл) — в начале КАЖДОГО хода тянуть +1 карту.
+
+    Постоянное преимущество по картам (в отличие от разовой Второй смены):
+    раскручивает цикл-движок и пейофф-карты «за число сыгранных карт».
+    """
+
+    id = "skorosshivatel"
+    name = "Скоросшиватель"
+    description = "В начале каждого хода тянуть +1 карту"
+
+    def on_turn_start(self, combat) -> None:
+        combat.draw(1)
+
+
 # Реестр доступных реликвий (фабрики — каждый забег свежий экземпляр).
 RELIC_REGISTRY: list = [
     PechatSoglasovano,
@@ -796,6 +859,10 @@ RELIC_REGISTRY: list = [
     ChernyySpisok,
     VtorayaSmena,
     ByurokraticheskiyImmunitet,
+    VechnyyDedlayn,  # этап D (бёрст)
+    KaskaSTreshchinoy,  # этап D (танк)
+    ZhurnalZamechaniy,  # этап D (контроль)
+    Skorosshivatel,  # этап D (цикл)
 ]
 
 
