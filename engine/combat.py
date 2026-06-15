@@ -9,7 +9,12 @@ import random
 from typing import Optional
 
 from engine.models import Card, Combatant, Enemy, EnemyIntent, Hero
-from engine.statuses import STATUS, WEAKEN_DAMAGE_REDUCTION, spec_for
+from engine.statuses import (
+    CEITNOT_DAMAGE_MULT,
+    STATUS,
+    WEAKEN_DAMAGE_REDUCTION,
+    spec_for,
+)
 
 ENERGY_PER_TURN = 3
 HAND_SIZE = 5
@@ -276,6 +281,13 @@ class Combat:
             # Простой режет урон атаки на WEAKEN_DAMAGE_REDUCTION за стак
             weaken = enemy.get_status(STATUS.WEAKEN)
             value = max(0, intent.value - WEAKEN_DAMAGE_REDUCTION * weaken)
+            # Цейтнот на герое усиливает входящий урон (×1.5). Без статуса —
+            # нейтрально (множитель не применяется), поэтому Акт 1/golden целы.
+            if self.hero.get_status(STATUS.CEITNOT) > 0:
+                boosted = int(value * CEITNOT_DAMAGE_MULT)
+                if boosted != value:
+                    self._log(f"Цейтнот: входящий урон {value} → {boosted}")
+                value = boosted
             dealt = self.deal_damage(enemy, self.hero, value)
             if weaken:
                 self._log(f"{enemy.name}: Простой -{intent.value - value} к атаке")

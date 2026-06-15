@@ -10,6 +10,7 @@ from engine import effects as fx
 from engine.combat import (
     attack_intent,
     block_intent,
+    debuff_intent,
     new_enemy,
     skip_intent,
 )
@@ -604,6 +605,154 @@ def new_kvartalnyy_otchet() -> Enemy:
         ],
         id="boss_kvartalnyy",
         behavior=_boss_behavior,
+    )
+
+
+# ============================ АКТ 2 — ВРАГИ ============================
+# Рост сложности относительно Акта 1 (HP/урон ×~1.4) + новая ось угрозы:
+# статус «Цейтнот» (герой получает +50% урона атак). Числа подобраны так,
+# чтобы Акт 2 был проходим компетентным игроком на УСИЛЕННОЙ колоде, но жёстче
+# Акта 1 (см. tests/test_act2.py — замер проходимости авто-пилотом).
+
+
+def new_smetchik() -> Enemy:
+    """Сметчик-зануда — HP 46, чистый бугай (11 / блок 8 / 7 «не по расценкам»)."""
+    return new_enemy(
+        hp=46,
+        name="Сметчик-зануда",
+        intents=[
+            attack_intent(11, "⚔ 11 «пересчёт сметы»"),
+            block_intent(8),
+            attack_intent(7, "⚔ 7 «не по расценкам»"),
+        ],
+        id="smetchik",
+    )
+
+
+def new_avtnadzor() -> Enemy:
+    """Авторский надзор — HP 38: вешает Цейтнот, затем бьёт усиленно (14).
+
+    Связка-телеграф: ход 1 делает героя уязвимым (Цейтнот 2), ход 2 бьёт 14 —
+    под Цейтнотом это 21. Контрится снятием угрозы бронёй на втором ходу.
+    """
+    return new_enemy(
+        hp=38,
+        name="Авторский надзор",
+        intents=[
+            debuff_intent(STATUS.CEITNOT, 2),
+            attack_intent(14, "⚔ 14 «переделать по замечаниям»"),
+        ],
+        id="avtnadzor",
+    )
+
+
+def _gosexpertiza_behavior(combat, enemy: Enemy, turn_index: int) -> None:
+    """Госэкспертиза: разовый налог Промерзание 2 на 2-м ходу («заключение»)."""
+    if turn_index == 2:
+        combat.hero.add_status(STATUS.FROSTBITE, 2)
+        combat._log(f"{enemy.name}: «отрицательное заключение» — Промерзание 2")
+
+
+def new_gosexpertiza() -> Enemy:
+    """Госэкспертиза — HP 42: налог Промерзание 2 + тяжёлые удары (9 / 13)."""
+    return new_enemy(
+        hp=42,
+        name="Госэкспертиза",
+        intents=[
+            attack_intent(9, "⚔ 9 «несоответствие нормам»"),
+            attack_intent(13, "⚔ 13 «отрицательное заключение»"),
+        ],
+        id="gosexpertiza",
+        behavior=_gosexpertiza_behavior,
+    )
+
+
+def new_profsoyuz() -> Enemy:
+    """Профсоюз — HP 52, танк-контроль: блок 12 + Бюрократия каждый ход.
+
+    Давит энергию (как Согласование, но крепче и больнее), вынуждая играть
+    экономно. Видимая атака 8 телеграфируется, Бюрократию вешает поведение.
+    """
+    enemy = new_enemy(
+        hp=52,
+        name="Профсоюз",
+        intents=[
+            attack_intent(8, "⚔ 8 «по КЗоТ» + Бюрократия"),
+            block_intent(12),
+        ],
+        id="profsoyuz",
+    )
+
+    def _behavior(combat, e: Enemy, turn_index: int) -> None:
+        combat.hero.add_status(STATUS.BUREAUCRACY, 1)
+        combat._log(f"{e.name}: «коллективный договор» — Бюрократия 1")
+
+    enemy.behavior = _behavior
+    return enemy
+
+
+# ============================ АКТ 2 — ЭЛИТА ============================
+
+
+def _kurator_behavior(combat, enemy: Enemy, turn_index: int) -> None:
+    """Куратор стройки: разовый Цейтнот 2 на 3-м ходу («срываете график»)."""
+    if turn_index == 3:
+        combat.hero.add_status(STATUS.CEITNOT, 2)
+        combat._log(f"{enemy.name}: «срываете график!» — Цейтнот 2")
+
+
+def new_kurator() -> Enemy:
+    """Элита «Куратор стройки» — HP 82, 12 / блок 10 / 15 + разовый Цейтнот.
+
+    Гейт перед боссом Акта 2; гарантированно даёт реликвию в награду.
+    """
+    return new_enemy(
+        hp=82,
+        name="Куратор стройки",
+        intents=[
+            attack_intent(12, "⚔ 12 «где сроки?»"),
+            block_intent(10),
+            attack_intent(15, "⚔ 15 «срываете график»"),
+        ],
+        id="kurator",
+        behavior=_kurator_behavior,
+    )
+
+
+# ============================ АКТ 2 — БОСС ============================
+
+
+def _sdacha_behavior(combat, enemy: Enemy, turn_index: int) -> None:
+    """Приёмочная комиссия: разовая Бюрократия 2 (ход 2) и Цейтнот 2 (ход 4).
+
+    Оба дебафа РАЗОВЫЕ (вешаются по одному разу), а не в цикле — иначе финал
+    становится математически непроходимым. Между ними босс давит атаками/блоком.
+    """
+    if turn_index == 2:
+        combat.hero.add_status(STATUS.BUREAUCRACY, 2)
+        combat._log(f"{enemy.name}: «бумажная волокита» — Бюрократия 2")
+    elif turn_index == 4:
+        combat.hero.add_status(STATUS.CEITNOT, 2)
+        combat._log(f"{enemy.name}: «горящие сроки сдачи» — Цейтнот 2")
+
+
+def new_sdacha_obyekta() -> Enemy:
+    """Босс Акта 2 «Приёмочная комиссия» — HP 135, фазовый финал.
+
+    Цикл: 12 / блок 12 / 18 «объект не принят» / 14. Разовые дебафы — в
+    поведении (_sdacha_behavior). Финальная стена Акта 2.
+    """
+    return new_enemy(
+        hp=135,
+        name="Приёмочная комиссия",
+        intents=[
+            attack_intent(12, "⚔ 12 «замечания по приёмке»"),
+            block_intent(12),
+            attack_intent(18, "⚔ 18 «объект не принят»"),
+            attack_intent(14, "⚔ 14 «акт с дефектами»"),
+        ],
+        id="boss_sdacha",
+        behavior=_sdacha_behavior,
     )
 
 

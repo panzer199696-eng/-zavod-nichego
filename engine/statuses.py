@@ -25,6 +25,7 @@ class STATUS(str, Enum):
     DELEGATED = "delegated"  # Поручено (Директор)
     VOID = "void"  # Пустота: внутрибоевой ресурс, кэп 10
     WEAKEN = "weaken"  # Простой: -3 к урону атаки врага за стак (контроль-дебаф)
+    CEITNOT = "ceitnot"  # Цейтнот (Акт 2): герой получает +50% урона атак врага
 
 
 @dataclass(frozen=True)
@@ -59,10 +60,16 @@ _SPECS: dict[STATUS, StatusSpec] = {
     # Простой: висит на враге, спадает на 1 в конце ЕГО хода (decay тикает
     # в _enemy_turn). cap 3 → максимум -9 к атаке за ход.
     STATUS.WEAKEN: StatusSpec(STATUS.WEAKEN, cap=3, decay_on_turn_end=1),
+    # Цейтнот: висит на ГЕРОЕ, спадает на 1 в начале его хода (как Vulnerable
+    # в StS — счётчик ходов уязвимости). cap 4 → не дольше 4 ходов подряд.
+    STATUS.CEITNOT: StatusSpec(STATUS.CEITNOT, cap=4, decay_per_turn=1),
 }
 
 # Урон, который снимает один стак Простоя с атаки врага.
 WEAKEN_DAMAGE_REDUCTION = 3
+
+# Множитель входящего урона атак, пока на герое висит Цейтнот (+50%).
+CEITNOT_DAMAGE_MULT = 1.5
 
 
 def spec_for(key: STATUS) -> StatusSpec:
